@@ -1,92 +1,208 @@
-# teraform-hw-03
+# Домашнее задание к занятию «Управляющие конструкции в коде Terraform»
 
+------
 
+### Задание 1
 
-## Getting started
+1. Изучите проект.
+2. Заполните файл personal.auto.tfvars.
+3. Инициализируйте проект, выполните код. Он выполнится, даже если доступа к preview нет.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Приложите скриншот входящих правил «Группы безопасности» в ЛК Yandex Cloud или скриншот отказа в предоставлении доступа к preview-версии.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+### Решение
 
-## Add your files
+1. Скопировал проект и изчил;
+2. Скопировал файл файл personal.auto.tfvars с предыдущей задачи;
+3. Результат выполнения проекта:
+![Рис.1-1](img/%D0%A0%D0%B8%D1%81.1-1.png)  
+![Рис.1-2](img/%D0%A0%D0%B8%D1%81.1-2.png)  
+![Рис.1-3](img/%D0%A0%D0%B8%D1%81.1-3.png)  
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+------
+
+### Задание 2
+
+1. Создайте файл count-vm.tf. Опишите в нём создание двух **одинаковых** ВМ  web-1 и web-2 (не web-0 и web-1) с минимальными параметрами,   
+используя мета-аргумент **count loop**. Назначьте ВМ созданную в первом задании группу безопасности.  
+(как это сделать узнайте в документации провайдера yandex/compute_instance )  
+2. Создайте файл for_each-vm.tf. Опишите в нём создание двух ВМ с именами "main" и "replica" **разных** по cpu/ram/disk , используя мета-аргумент **for_each loop**. 
+Используйте для обеих ВМ одну общую переменную типа list(object({ vm_name=string, cpu=number, ram=number, disk=number  })).  
+При желании внесите в переменную все возможные параметры.  
+3. ВМ из пункта 2.2 должны создаваться после создания ВМ из пункта 2.1.
+4. Используйте функцию file в local-переменной для считывания ключа ~/.ssh/id_rsa.pub и его последующего использования в блоке metadata, взятому из ДЗ 2.
+5. Инициализируйте проект, выполните код.
+
+### Решение
+1. 
+![Рис.2-1](img/%D0%A0%D0%B8%D1%81.2-1.png)  
+![Рис.2-2](img/%D0%A0%D0%B8%D1%81.2-2.png)  
+![Рис.2-3](img/%D0%A0%D0%B8%D1%81.2-3.png)  
+![Рис.2-4](img/%D0%A0%D0%B8%D1%81.2-4.png)  
+2.
+![Рис.2-7](img/%D0%A0%D0%B8%D1%81.2-7.png)  
+3. 
+```
+зависиит от. Это значит, что пока не создатся web, db - не начнет создаваться
+depends_on = [ yandex_compute_instance.web ]
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/devops-netology-bav/lessons/ter-homeworks/teraform-hw-03.git
-git branch -M main
-git push -uf origin main
+4. Добавил local { ssh = ... }
+
+5. Запуск проекта:   
+![Рис.2-5](img/%D0%A0%D0%B8%D1%81.2-5.png)  
+![Рис.2-6](img/%D0%A0%D0%B8%D1%81.2-6.png)  
+
+- Также прочитал и выяснил, что можно немного оптимизировать код:  
 ```
+Определить переменную
 
-## Integrate with your tools
+variable "instance_config" {
+  description = "Configuration for Yandex Compute Instance"
+  type        = map(object({
+    name         = string
+    zone         = string
+    machine_type = string
+    image        = string
+  }))
+  default     = {
+    example_instance = {
+      name         = "example-instance"
+      zone         = "ru-central1-a"
+      machine_type = "e2.micro"
+      image        = "ubuntu-2004-lts"
+    }
+  }
+}
+Использовать переменную в ресурсе `yandex_compute_instance`
 
-- [ ] [Set up project integrations](https://gitlab.com/devops-netology-bav/lessons/ter-homeworks/teraform-hw-03/-/settings/integrations)
+resource "yandex_compute_instance" "example" {
+  count = length(var.instance_config)
 
-## Collaborate with your team
+  for_each = var.instance_config
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+  name         = each.value.name
+  zone         = each.value.zone
+  machine_type = each.value.machine_type
+  boot_disk {
+    initialize_params {
+      image_id = data.yandex_compute_image.image.id
+    }
+  }
+  network_interface {
+    subnet_id = yandex_vpc_subnet.example.id
+  }
+}
 
-## Test and Deploy
+создать несколько конфигураций, например:
 
-Use the built-in continuous integration in GitLab.
+module "instance1" {
+  source = "example_module"
+  instance_config = {
+    example_instance1 = {
+      name         = "instance1"
+      zone         = "ru-central1-a"
+      machine_type = "e2.micro"
+      image        = "ubuntu-2004-lts"
+    }
+  }
+}
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+module "instance2" {
+  source = "example_module"
+  instance_config = {
+    example_instance2 = {
+      name         = "instance2"
+      zone         = "ru-central1-b"
+      machine_type = "e2.small"
+      image        = "debian-10"
+    }
+  }
+}
 
-***
 
-# Editing this README
+Что позволит использовать один `yandex_compute_instance`
+ ресурс с разными конфигурациями, указанными в переменной `instance_config`
+```
+------
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### Задание 3
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+1. Создайте 3 одинаковых виртуальных диска размером 1 Гб с помощью ресурса yandex_compute_disk и мета-аргумента count в файле **disk_vm.tf** .
+2. Создайте в том же файле **одиночную**(использовать count или for_each запрещено из-за задания №4) ВМ c именем "storage"  . Используйте блок **dynamic secondary_disk{..}** и мета-аргумент for_each для подключения созданных вами дополнительных дисков.
 
-## Name
-Choose a self-explaining name for your project.
+### Решение:
+1. Создал файл и добавил конфигурацию 
+![Рис.3-1](img/%D0%A0%D0%B8%D1%81.3-1.png)  
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+2. Результат выполнения:  
+![Рис.3-2](img/%D0%A0%D0%B8%D1%81.3-2.png)  
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+------
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Задание 4
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+1. В файле ansible.tf создайте inventory-файл для ansible.
+Используйте функцию tepmplatefile и файл-шаблон для создания ansible inventory-файла из лекции.
+Готовый код возьмите из демонстрации к лекции [**demonstration2**](https://github.com/netology-code/ter-homeworks/tree/main/03/demonstration2).
+Передайте в него в качестве переменных группы виртуальных машин из задания 2.1, 2.2 и 3.2, т. е. 5 ВМ.
+2. Инвентарь должен содержать 3 группы [webservers], [databases], [storage] и быть динамическим, т. е. обработать как группу из 2-х ВМ, так и 999 ВМ.
+4. Выполните код. Приложите скриншот получившегося файла. 
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### Решение:
+- добавил файлы;  
+- отредактировал конфигурацию;  
+- выполнил команду **terraform init -upgrade**;  
+- Запустил код  
+![Рис.4-1](img/%D0%A0%D0%B8%D1%81.4-1.png)  
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+Для общего зачёта создайте в вашем GitHub-репозитории новую ветку terraform-03. Закоммитьте в эту ветку свой финальный код проекта, пришлите ссылку на коммит.   
+**Удалите все созданные ресурсы**.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+------
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## Дополнительные задания (со звездочкой*)
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+**Настоятельно рекомендуем выполнять все задания со звёздочкой.** Они помогут глубже разобраться в материале.   
+Задания со звёздочкой дополнительные, не обязательные к выполнению и никак не повлияют на получение вами зачёта по этому домашнему заданию. 
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Задание 5* (необязательное)
+1. Напишите output, который отобразит все 5 созданных ВМ в виде списка словарей:
+``` 
+[
+ {
+  "name" = 'имя ВМ1'
+  "id"   = 'идентификатор ВМ1'
+  "fqdn" = 'Внутренний FQDN ВМ1'
+ },
+ {
+  "name" = 'имя ВМ2'
+  "id"   = 'идентификатор ВМ2'
+  "fqdn" = 'Внутренний FQDN ВМ2'
+ },
+ ....
+]
+```
+Приложите скриншот вывода команды ```terrafrom output```.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+------
 
-## License
-For open source projects, say how it is licensed.
+### Задание 6* (необязательное)
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+1. Используя null_resource и local-exec, примените ansible-playbook к ВМ из ansible inventory-файла.
+Готовый код возьмите из демонстрации к лекции [**demonstration2**](https://github.com/netology-code/ter-homeworks/tree/main/demonstration2).
+3. Дополните файл шаблон hosts.tftpl. 
+Формат готового файла:
+```netology-develop-platform-web-0   ansible_host="<внешний IP-address или внутренний IP-address если у ВМ отсутвует внешний адрес>"```
+
+Для проверки работы уберите у ВМ внешние адреса. Этот вариант используется при работе через bastion-сервер.
+Для зачёта предоставьте код вместе с основной частью задания.
+
+### Использованые ресурсы:
+[**Ссылка_1**](https://ikshitij.com/open-connection-authentication-agent).
+[**Ссылка_2**](https://andrdi.com/blog/terraform-ansible-provisioner.html).
+[**Ссылка_3**](https://habr.com/ru/companies/nixys/articles/721404/).
+[**Ссылка_4**](https://sidmid.ru/%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B0%D1%82%D1%8C-%D1%81-terraform-%D0%B2-yandex-%D0%BE%D0%B1%D0%BB%D0%B0%D0%BA%D0%B5/).
+
+
+
