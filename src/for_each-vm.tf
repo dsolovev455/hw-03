@@ -22,10 +22,8 @@ resource "yandex_compute_instance" "db" {
     nat       = true
   }
 
-  metadata = {
-    serial-port-enable = 1
-    ssh-keys = local.ssh
-  }
+  metadata = local.vms_metadata
+  
 }
 
 locals {
@@ -45,6 +43,3 @@ locals {
   ]
 }
 
-locals {
-  ssh = "ubuntu:${var.vms_ssh_root_key}"
-}

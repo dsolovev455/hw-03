@@ -15,9 +15,9 @@ resource "null_resource" "web_hosts_provision" {
 #Ждем создания инстанса
 depends_on = [yandex_compute_instance.storage, local_file.inventory_cfg]
 
+
 #Добавление ПРИВАТНОГО ssh ключа в ssh-agent
   provisioner "local-exec" {
-#    command = "cat ~/.ssh/id_ed25519 | ssh-add -"
     command = "cat ~/.ssh/id_ed25519 | ssh-add -"
   }
 
